@@ -11,7 +11,7 @@
         <h1>OctoPrint Manager</h1>
         <div class="system-actions">
           <button id="restartBtn" class="system-btn restart-system-btn">
-            Restart System
+            Restart
           </button>
           <button id="shutdownBtn" class="system-btn shutdown-btn">
             Shutdown
@@ -58,7 +58,6 @@
 
     <script>
       let currentContainerId = null;
-      let statusCheckIntervals = {};
 
       function showLoading(message = "Loading...") {
         document.getElementById("loadingMessage").textContent = message;
@@ -69,70 +68,11 @@
         document.getElementById("loadingOverlay").style.display = "none";
       }
 
-      function checkContainerStatus(containerId, port) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-        fetch(`http://localhost:${port}/api/version`, {
-          signal: controller.signal,
-          mode: "no-cors",
-        })
-          .then((response) => {
-            clearTimeout(timeoutId);
-            updateContainerStatus(containerId, true);
-          })
-          .catch((error) => {
-            clearTimeout(timeoutId);
-            updateContainerStatus(containerId, false);
-          });
-      }
-
-      function updateContainerStatus(containerId, isOnline) {
-        const statusDot = document.getElementById(`status-${containerId}`);
-        const statusText = document.getElementById(
-          `status-text-${containerId}`
-        );
-
-        if (statusDot && statusText) {
-          if (isOnline) {
-            statusDot.className = "status-dot online";
-            statusText.textContent = "Connected";
-            statusText.className = "status-text online";
-          } else {
-            statusDot.className = "status-dot offline";
-            statusText.textContent = "Offline";
-            statusText.className = "status-text offline";
-          }
-        }
-      }
-
-      function startContainerMonitoring(containerId, port) {
-        if (statusCheckIntervals[containerId]) {
-          clearInterval(statusCheckIntervals[containerId]);
-        }
-
-        checkContainerStatus(containerId, port);
-
-        statusCheckIntervals[containerId] = setInterval(() => {
-          checkContainerStatus(containerId, port);
-        }, 10000);
-      }
-
-      function stopAllMonitoring() {
-        Object.values(statusCheckIntervals).forEach((interval) =>
-          clearInterval(interval)
-        );
-        statusCheckIntervals = {};
-      }
-
       function loadContainers() {
         fetch("/api/getcontainers")
           .then((response) => response.json())
           .then((data) => {
             const containersList = document.getElementById("containersList");
-
-            // Stop all existing monitoring
-            stopAllMonitoring();
 
             if (data.error || data.containers.length === 0) {
               containersList.innerHTML =
@@ -156,10 +96,6 @@
               <p>Port: ${container.port}</p>
               <p>Device: ${container.device}</p>
             </div>
-            <div class="status-indicator">
-              <span id="status-${container.id}" class="status-dot checking"></span>
-              <span id="status-text-${container.id}" class="status-text">Checking...</span>
-            </div>
           </div>
           <div class="container-actions">
             <button class="action-btn open-btn" onclick="openOctoPrint(${container.port})">Open</button>
@@ -170,9 +106,6 @@
         `;
 
               containersList.appendChild(containerCard);
-
-              // Start monitoring this container
-              startContainerMonitoring(container.id, container.port);
             });
           })
           .catch((error) => {
@@ -184,7 +117,11 @@
         window.open(`http://localhost:${port}`, "_blank");
       }
       function restartContainer(id) {
-        if (!confirm("Are you sure you want to restart this Octoprint instance? The connected 3d printer will stop printing.")) {
+        if (
+          !confirm(
+            "Are you sure you want to restart this Octoprint instance? The connected 3d printer will stop printing."
+          )
+        ) {
           return;
         }
 
@@ -215,7 +152,9 @@
             clearTimeout(timeoutId);
             hideLoading();
             console.error("Failed to restart Octoprint Instance:", error);
-            alert("Failed to restart Octoprint Instance - request timed out or failed");
+            alert(
+              "Failed to restart Octoprint Instance - request timed out or failed"
+            );
           });
       }
 
@@ -293,7 +232,9 @@
             clearTimeout(timeoutId);
             hideLoading();
             console.error("Failed to delete Octoprint Instance:", error);
-            alert("Failed to delete Octoprint Instance - request timed out or failed");
+            alert(
+              "Failed to delete Octoprint Instance - request timed out or failed"
+            );
           });
       }
 
@@ -457,8 +398,6 @@
         .getElementById("shutdownBtn")
         .addEventListener("click", shutdownSystem);
 
-      window.addEventListener("beforeunload", stopAllMonitoring);
-
       loadContainers();
     </script>
 
@@ -555,62 +494,6 @@
         color: #8b949e;
         margin: 5px 0;
         font-size: 14px;
-      }
-
-      .status-indicator {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 12px;
-        background-color: #0d1117;
-        border: 1px solid #30363d;
-        border-radius: 4px;
-      }
-
-      .status-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        flex-shrink: 0;
-      }
-
-      .status-dot.online {
-        background-color: #3fb950;
-        box-shadow: 0 0 8px #3fb950;
-        animation: pulse 2s ease-in-out infinite;
-      }
-
-      .status-dot.offline {
-        background-color: #f85149;
-        box-shadow: 0 0 8px #f85149;
-      }
-
-      .status-dot.checking {
-        background-color: #8b949e;
-      }
-
-      @keyframes pulse {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.5;
-        }
-      }
-
-      .status-text {
-        font-size: 12px;
-        font-weight: 500;
-        white-space: nowrap;
-      }
-
-      .status-text.online {
-        color: #3fb950;
-      }
-
-      .status-text.offline {
-        color: #f85149;
       }
 
       .container-actions {
