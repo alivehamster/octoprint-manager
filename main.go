@@ -60,6 +60,20 @@ func main() {
 
 	utils.RecreateAllContainers(cli, db)
 
+	app.Get("/api/screenoff", func(c *fiber.Ctx) error {
+
+		cmd := exec.Command("bash", "./screenoff.sh")
+
+		err := cmd.Run()
+
+		if err != nil {
+			fmt.Println("Screen off command failed:", err)
+			return c.Status(500).SendString("Failed to turn off screen")
+		}
+
+		return c.SendString("Screen off command executed")
+	})
+
 	app.Get("/api/reboot", func(c *fiber.Ctx) error {
 
 		cmd := exec.Command("reboot")

@@ -10,6 +10,9 @@
       <div class="header">
         <h1>OctoPrint Manager</h1>
         <div class="system-actions">
+          <button id="screenOffBtn" class="system-btn screen-off-btn">
+            Screen Off
+          </button>
           <button id="restartBtn" class="system-btn restart-system-btn">
             Restart
           </button>
@@ -365,6 +368,23 @@
           });
       }
 
+      function screenOff() {
+        showLoading("Turning off screen...");
+
+        fetch("/api/screenoff", {
+          method: "GET",
+        })
+          .then((response) => response.text())
+          .then((data) => {
+            hideLoading();
+          })
+          .catch((error) => {
+            hideLoading();
+            console.error("Failed to turn off screen:", error);
+            alert("Failed to turn off screen");
+          });
+      }
+
       function shutdownSystem() {
         if (
           !confirm(
@@ -391,6 +411,9 @@
           });
       }
 
+      document
+        .getElementById("screenOffBtn")
+        .addEventListener("click", screenOff);
       document
         .getElementById("restartBtn")
         .addEventListener("click", restartSystem);
@@ -686,6 +709,15 @@
         font-size: 14px;
         font-weight: 600;
         transition: all 0.2s;
+      }
+
+      .screen-off-btn {
+        background-color: #6e7681;
+        color: white;
+      }
+
+      .screen-off-btn:hover {
+        background-color: #8b949e;
       }
 
       .restart-system-btn {
