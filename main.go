@@ -54,9 +54,6 @@ func main() {
 
 	log.Println("Containers table ready")
 
-	app := fiber.New()
-	app.Static("/", "./frontend")
-
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		log.Fatal("failed to create docker client:", err)
@@ -75,6 +72,9 @@ func main() {
 		}
 		log.Println("Some containers failed to start:", err)
 	}
+
+	app := fiber.New()
+	app.Static("/", "./frontend")
 
 	app.Get("/api/screenoff", func(c *fiber.Ctx) error {
 
