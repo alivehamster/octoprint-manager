@@ -19,7 +19,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func CreateOctoPrintContainer(cli *client.Client, id string, device string, port int) (string, error) {
+func CreateOctoPrintContainer(cli *client.Client, id string, device string, port int, configdir string) (string, error) {
 	portStr := strconv.Itoa(port)
 	containerPort := "80/tcp"
 
@@ -48,7 +48,7 @@ func CreateOctoPrintContainer(cli *client.Client, id string, device string, port
 		Mounts: []mount.Mount{
 			{
 				Type:   mount.TypeBind,
-				Source: fmt.Sprintf("/mnt/storage/octoprint/%s", id),
+				Source: fmt.Sprintf("%s/octoprint/%s", configdir, id),
 				Target: "/octoprint",
 			},
 		},
@@ -102,19 +102,19 @@ func getNextAvailablePort(db *sql.DB) (int, error) {
 	return int(maxPort.Int64) + 1, nil
 }
 
-func CreateNewContainer(cli *client.Client, db *sql.DB, device string) (string, error) {
+func CreateNewContainer(cli *client.Client, db *sql.DB, device string, configdir string) (string, error) {
 	id := uuid.New().String()
 	port, err := getNextAvailablePort(db)
 	if err != nil {
 		return "", fmt.Errorf("failed to get next available port: %w", err)
 	}
 
-	volumePath := fmt.Sprintf("/mnt/storage/octoprint/%s", id)
+	volumePath := fmt.Sprintf("%s/octoprint/%s", configdir, id)
 	if err := os.MkdirAll(volumePath, 0755); err != nil {
 		return "", fmt.Errorf("failed to create volume directory: %w", err)
 	}
 
-	containerName, err := CreateOctoPrintContainer(cli, id, device, port)
+	containerName, err := CreateOctoPrintContainer(cli, id, device, port, configdir)
 	if err != nil {
 		return "", err
 	}
@@ -127,7 +127,7 @@ func CreateNewContainer(cli *client.Client, db *sql.DB, device string) (string, 
 	return containerName, nil
 }
 
-func RecreateAllContainers(cli *client.Client, db *sql.DB) (error, map[string]bool) {
+func RecreateAllContainers(cli *client.Client, db *sql.DB, configdir string) (error, map[string]bool) {
 	rows, err := db.Query("SELECT id, device, port FROM containers")
 	if err != nil {
 		return fmt.Errorf("failed to query containers: %w", err), nil
@@ -163,7 +163,7 @@ func RecreateAllContainers(cli *client.Client, db *sql.DB) (error, map[string]bo
 			continue
 		}
 
-		_, err = CreateOctoPrintContainer(cli, id, device, port)
+		_, err = CreateOctoPrintContainer(cli, id, device, port, configdir)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("failed to create container %s: %v", containerName, err))
 			containerStatus[id] = false
@@ -205,7 +205,7 @@ func EnsureOctoPrintImage(cli *client.Client) error {
 	return nil
 }
 
-func DeleteContainer(c *fiber.Ctx, cli *client.Client, db *sql.DB, id string) error {
+func DeleteContainer(c *fiber.Ctx, cli *client.Client, db *sql.DB, id string, configdir string) error {
 	containerName := fmt.Sprintf("octoprint-%s", id)
 
 	// Stop the container
@@ -239,7 +239,7 @@ func DeleteContainer(c *fiber.Ctx, cli *client.Client, db *sql.DB, id string) er
 	}
 
 	// Delete the storage directory
-	volumePath := fmt.Sprintf("/mnt/storage/octoprint/%s", id)
+	volumePath := fmt.Sprintf("%s/octoprint/%s", configdir, id)
 	if err := os.RemoveAll(volumePath); err != nil {
 		log.Println("Failed to delete volume directory:", err)
 		return c.Status(500).JSON(fiber.Map{

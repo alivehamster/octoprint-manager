@@ -16,7 +16,18 @@ import (
 )
 
 func main() {
-	db, err := sql.Open("sqlite3", "/mnt/storage/octoprint.db")
+
+	configdir := "./config"
+
+	if len(os.Args) == 2 {
+		configdir = os.Args[1]
+	}
+
+	if err := os.MkdirAll(configdir, 0755); err != nil {
+		log.Fatal("Failed to create config directory:", err)
+	}
+
+	db, err := sql.Open("sqlite3", configdir+"/octoprint.db")
 	if err != nil {
 		log.Fatal("Failed to open database:", err)
 	}
@@ -57,7 +68,7 @@ func main() {
 		log.Fatal("failed to ensure octoprint image:", err)
 	}
 
-	err, containerStatus := utils.RecreateAllContainers(cli, db)
+	err, containerStatus := utils.RecreateAllContainers(cli, db, configdir)
 	if err != nil {
 		if containerStatus == nil {
 			log.Fatal("failed to recreate containers:", err)
@@ -177,7 +188,7 @@ func main() {
 				"error": "Invalid request body",
 			})
 		}
-		containerName, err := utils.CreateNewContainer(cli, db, req.Device)
+		containerName, err := utils.CreateNewContainer(cli, db, req.Device, configdir)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{
 				"error": fmt.Sprintf("Failed to create container: %v", err),
@@ -254,7 +265,7 @@ func main() {
 			})
 		}
 
-		utils.DeleteContainer(c, cli, db, req.Id)
+		utils.DeleteContainer(c, cli, db, req.Id, configdir)
 
 		return c.JSON(fiber.Map{
 			"error": false,
@@ -301,7 +312,7 @@ func main() {
 				})
 			}
 
-			_, err = utils.CreateOctoPrintContainer(cli, req.Id, device, port)
+			_, err = utils.CreateOctoPrintContainer(cli, req.Id, device, port, configdir)
 			if err != nil {
 				log.Println("Failed to recreate container:", err)
 				containerStatus[req.Id] = false
