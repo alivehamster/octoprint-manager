@@ -19,7 +19,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func createOctoPrintContainer(cli *client.Client, id string, device string, port int) (string, error) {
+func CreateOctoPrintContainer(cli *client.Client, id string, device string, port int) (string, error) {
 	portStr := strconv.Itoa(port)
 	containerPort := "80/tcp"
 
@@ -114,7 +114,7 @@ func CreateNewContainer(cli *client.Client, db *sql.DB, device string) (string, 
 		return "", fmt.Errorf("failed to create volume directory: %w", err)
 	}
 
-	containerName, err := createOctoPrintContainer(cli, id, device, port)
+	containerName, err := CreateOctoPrintContainer(cli, id, device, port)
 	if err != nil {
 		return "", err
 	}
@@ -127,7 +127,7 @@ func CreateNewContainer(cli *client.Client, db *sql.DB, device string) (string, 
 	return containerName, nil
 }
 
-func RecreateAllContainers(cli *client.Client, db *sql.DB) (error, []string) {
+func RecreateAllContainers(cli *client.Client, db *sql.DB) (error, map[string]bool) {
 	rows, err := db.Query("SELECT id, device, port FROM containers")
 	if err != nil {
 		return fmt.Errorf("failed to query containers: %w", err), nil
@@ -135,7 +135,8 @@ func RecreateAllContainers(cli *client.Client, db *sql.DB) (error, []string) {
 	defer rows.Close()
 
 	var errors []string
-	var failedContainers []string
+	containerStatus := make(map[string]bool)
+
 	for rows.Next() {
 		var id, device string
 		var port int
@@ -146,6 +147,7 @@ func RecreateAllContainers(cli *client.Client, db *sql.DB) (error, []string) {
 		}
 
 		containerName := fmt.Sprintf("octoprint-%s", id)
+		containerStatus[id] = true
 
 		// Check if container exists
 		containerJSON, err := cli.ContainerInspect(context.Background(), containerName)
@@ -156,15 +158,15 @@ func RecreateAllContainers(cli *client.Client, db *sql.DB) (error, []string) {
 			err = cli.ContainerStart(context.Background(), containerName, container.StartOptions{})
 			if err != nil {
 				errors = append(errors, fmt.Sprintf("failed to start existing container %s: %v", containerName, err))
-				failedContainers = append(failedContainers, id)
+				containerStatus[id] = false
 			}
 			continue
 		}
 
-		_, err = createOctoPrintContainer(cli, id, device, port)
+		_, err = CreateOctoPrintContainer(cli, id, device, port)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("failed to create container %s: %v", containerName, err))
-			failedContainers = append(failedContainers, id)
+			containerStatus[id] = false
 			continue
 		}
 	}
@@ -173,10 +175,10 @@ func RecreateAllContainers(cli *client.Client, db *sql.DB) (error, []string) {
 		return fmt.Errorf("error iterating rows: %w", err), nil
 	}
 	if len(errors) > 0 {
-		return fmt.Errorf("encountered errors while starting containers: %v", errors), failedContainers
+		return fmt.Errorf("encountered errors while starting containers: %v", errors), containerStatus
 	}
 
-	return nil, nil
+	return nil, containerStatus
 }
 
 func EnsureOctoPrintImage(cli *client.Client) error {

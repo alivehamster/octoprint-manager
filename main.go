@@ -16,7 +16,6 @@ import (
 )
 
 func main() {
-
 	db, err := sql.Open("sqlite3", "/mnt/storage/octoprint.db")
 	if err != nil {
 		log.Fatal("Failed to open database:", err)
@@ -58,13 +57,12 @@ func main() {
 		log.Fatal("failed to ensure octoprint image:", err)
 	}
 
-	err, failedContainers := utils.RecreateAllContainers(cli, db)
+	err, containerStatus := utils.RecreateAllContainers(cli, db)
 	if err != nil {
-		if failedContainers == nil {
+		if containerStatus == nil {
 			log.Fatal("failed to recreate containers:", err)
 		}
 		log.Println("Some containers failed to start:", err)
-
 	}
 
 	app.Get("/api/screenoff", func(c *fiber.Ctx) error {
@@ -207,6 +205,7 @@ func main() {
 			Port   int     `json:"port"`
 			Name   *string `json:"name"`
 			Device string  `json:"device"`
+			Status bool    `json:"status"`
 		}
 
 		containers := make([]ContainerInfo, 0)
@@ -225,6 +224,7 @@ func main() {
 				Port:   port,
 				Name:   name,
 				Device: device,
+				Status: containerStatus[id],
 			})
 		}
 
@@ -275,13 +275,44 @@ func main() {
 			})
 		}
 
-		err := cli.ContainerRestart(context.Background(), "octoprint-"+req.Id, container.StopOptions{})
-		if err != nil {
-			log.Println("Failed to restart container:", err)
-			return c.Status(500).JSON(fiber.Map{
-				"error": "Failed to restart container",
-			})
+		containerName := "octoprint-" + req.Id
+
+		_, err := cli.ContainerInspect(context.Background(), containerName)
+		if err == nil {
+			err := cli.ContainerRestart(context.Background(), containerName, container.StopOptions{})
+			if err != nil {
+				log.Println("Failed to restart container:", err)
+				containerStatus[req.Id] = false
+				return c.Status(500).JSON(fiber.Map{
+					"error":  "Failed to restart container",
+					"status": false,
+				})
+			}
+		} else {
+			var device string
+			var port int
+			err := db.QueryRow("SELECT device, port FROM containers WHERE id = ?", req.Id).Scan(&device, &port)
+			if err != nil {
+				log.Println("Failed to get container info from database:", err)
+				containerStatus[req.Id] = false
+				return c.Status(500).JSON(fiber.Map{
+					"error":  "Failed to get container info",
+					"status": false,
+				})
+			}
+
+			_, err = utils.CreateOctoPrintContainer(cli, req.Id, device, port)
+			if err != nil {
+				log.Println("Failed to recreate container:", err)
+				containerStatus[req.Id] = false
+				return c.Status(500).JSON(fiber.Map{
+					"error":  "Failed to recreate container",
+					"status": false,
+				})
+			}
 		}
+
+		containerStatus[req.Id] = true
 
 		return c.JSON(fiber.Map{
 			"error": false,
