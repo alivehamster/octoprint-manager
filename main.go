@@ -58,7 +58,14 @@ func main() {
 		log.Fatal("failed to ensure octoprint image:", err)
 	}
 
-	utils.RecreateAllContainers(cli, db)
+	err, failedContainers := utils.RecreateAllContainers(cli, db)
+	if err != nil {
+		if failedContainers == nil {
+			log.Fatal("failed to recreate containers:", err)
+		}
+		log.Println("Some containers failed to start:", err)
+
+	}
 
 	app.Get("/api/screenoff", func(c *fiber.Ctx) error {
 
