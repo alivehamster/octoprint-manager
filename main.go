@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -17,10 +18,15 @@ import (
 
 func main() {
 
-	configdir := "./config"
+	path := "./config"
 
 	if len(os.Args) == 2 {
-		configdir = os.Args[1]
+		path = os.Args[1]
+	}
+
+	configdir, err := filepath.Abs(path)
+	if err != nil {
+		log.Fatal("Failed to resolve config directory path:", err)
 	}
 
 	if err := os.MkdirAll(configdir, 0755); err != nil {
@@ -194,6 +200,8 @@ func main() {
 				"error": fmt.Sprintf("Failed to create container: %v", err),
 			})
 		}
+
+		containerStatus[containerName[len("octoprint-"):]] = true
 
 		return c.JSON(fiber.Map{
 			"error":         false,

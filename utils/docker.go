@@ -224,9 +224,6 @@ func DeleteContainer(c *fiber.Ctx, cli *client.Client, db *sql.DB, id string, co
 	}
 	if err := cli.ContainerRemove(ctx, containerName, removeOptions); err != nil {
 		log.Println("Failed to remove container:", err)
-		return c.Status(500).JSON(fiber.Map{
-			"error": "Failed to remove container",
-		})
 	}
 
 	// Delete from database
