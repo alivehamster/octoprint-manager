@@ -1,4 +1,4 @@
-module nxweb.com/octoprint-manager
+module github.com/alivehamster/octoprint-manager
 
 go 1.25.4
 

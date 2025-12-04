@@ -9,11 +9,11 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/alivehamster/octoprint-manager/utils"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/gofiber/fiber/v2"
 	_ "github.com/mattn/go-sqlite3"
-	"nxweb.com/octoprint-manager/utils"
 )
 
 func main() {
