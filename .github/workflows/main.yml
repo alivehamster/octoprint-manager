@@ -1,0 +1,62 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Build Binary
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o output/octoprint-manager .
+          
+      - name: Move Static Files
+        run: mv frontend output
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: octoprint-manager
+          path: output
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: octoprint-manager
+          path: release_files
+
+      - name: Create Archives
+        run: |
+          zip -r octoprint-manager-latest.zip release_files/*
+          tar -czvf octoprint-manager-latest.tar.gz release_files/
+          
+      - name: Create or Update Latest Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          body: "Automatic build from last push to main. [See commit history](https://github.com/${{ github.repository }}/commits/main)"
+          files: |
+            octoprint-manager-latest.zip
+            octoprint-manager-latest.tar.gz
+            prerelease: true
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
